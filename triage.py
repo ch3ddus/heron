@@ -4,18 +4,28 @@ import re
 import os
 import sys
 
+# Points added by each indicator, and the score thresholds for each verdict
+W_KEYWORD = 1
+W_IP_LINK = 3
+W_PUNKYCODE_LINK = 3
+W_BRAND_MISMATCH = 3
+W_AUTH_FAIL = 2
+W_REPLY_TO_MISMATCH = 2
+PHISHING_THRESHOLD = 5
+SUSPICIOUS_THRESHOLD = 3
+
 scores = {}
 verdicts = []
 
 KEYWORDS = ["urgent", "verify", "suspended", "password", "expires", "act now",
             "congratulations", "winner", "claim", "immediately", "gift card"]
 
-def check_mail(folder="/home/lgarcia/mail_export/", flagged=[]):
+def check_mail(folder, flagged=[]): 
     files = os.listdir(folder)
     for fn in files:
         if not fn.endswith(".eml"):
             continue
-        raw = open(folder + "/" + fn, encoding="utf-8", errors="ignore").read()
+        raw = open(os.path.join(folder, fn), encoding="utf-8", errors="ignore").read()
         s = 0
         try:
             frm = re.search("From: (.*)", raw).group(1)
@@ -33,7 +43,7 @@ def check_mail(folder="/home/lgarcia/mail_export/", flagged=[]):
         urls = re.findall("https?://[^\\s\"'<>]+", raw)
         for u in urls:
             if re.match("https?://[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+", u):
-                s = s + 3  # ip address url, very bad
+                s = s + W_IP_LINK  # ip address url, very bad
             if "xn--" in u:
                 s = s + 3
         # sender says paypal/microsoft/amazon but domain is weird
@@ -55,7 +65,7 @@ def check_mail(folder="/home/lgarcia/mail_export/", flagged=[]):
         except:
             pass
         scores[fn] = s
-        if s >= 5:
+        if s >= PHISHING_THRESHOLD:
             verdicts.append((fn, "PHISHING", s))
             flagged.append(fn)
         elif s >= 3:
@@ -71,7 +81,7 @@ def check_mail(folder="/home/lgarcia/mail_export/", flagged=[]):
     print("flagged:", flagged)
 
 if __name__ == "__main__":
-    if len(sys.argv) > 1:
-        check_mail(sys.argv[1])
-    else:
-        check_mail()
+    if len(sys.argv) != 2:
+        print("usage: python triage.py <folder-with-eml-files>", file=sys.stderr)
+        sys.exit(2)
+    check_mail(sys.argv[1])
